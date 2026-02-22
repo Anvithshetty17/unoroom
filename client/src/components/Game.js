@@ -13,7 +13,7 @@ import draw4CardSound from '../assets/sounds/draw4-sound.mp3'
 import gameOverSound from '../assets/sounds/game-over-sound.mp3'
 
 let socket
-const ENDPOINT = 'http://localhost:5000'
+const ENDPOINT = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000'
 const MAX_PLAYERS = 10
 
 const Game = (props) => {
