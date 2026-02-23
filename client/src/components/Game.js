@@ -411,27 +411,40 @@ const Game = (props) => {
 
                     {gameOver && winner !== '' && (
                         <div className='gameOverScreen'>
-                            <h1>GAME OVER</h1>
-                            <h2>{winner} wins! 🎉</h2>
-                            <div className='gameOverPlayers'>
-                                {users.map((u, idx) => (
-                                    <span key={u.name} className={`gameOverPlayerBadge${u.name === winner ? ' gameOverWinner' : ''}`}>
-                                        {u.name === winner ? '👑 ' : ''}{u.name}
-                                        {idx === 0 && u.name !== winner ? ' (host)' : ''}
-                                    </span>
-                                ))}
-                            </div>
+                            <div className='goTrophy'>🏆</div>
+                            <p className='goCongrats'>CONGRATULATIONS!</p>
+                            <h1 className='goWinnerName'>{winner}</h1>
+                            <p className='goSubtitle'>wins the game!</p>
+                            <div className='goDivider' />
+                            <p className='goPlayersLabel'>{users.length} / {MAX_PLAYERS} PLAYERS</p>
+                            <ul className='goPlayerList'>
+                                {users.map((u, idx) => {
+                                    const isWin = u.name === winner
+                                    const isHst = idx === 0
+                                    return (
+                                        <li key={u.name} className={`goPlayerItem${isWin ? ' goPlayerItemWin' : ''}`}>
+                                            <span className='goPlayerName'>
+                                                {isWin ? '👑 ' : ''}{u.name}
+                                            </span>
+                                            <span className='goBadges'>
+                                                {isHst && <span className='goBadgeHost'>HOST</span>}
+                                                {isWin && <span className='goBadgeWinner'>WINNER</span>}
+                                            </span>
+                                        </li>
+                                    )
+                                })}
+                            </ul>
                             {isHost ? (
                                 <button
                                     className='game-button green restartBtn'
                                     onClick={() => socketRef.current && socketRef.current.emit('restartGame')}
                                 >
-                                    🔄 Play Again
+                                    🔄 Play Again ({users.length} players)
                                 </button>
                             ) : (
                                 <div className='waitingRestart'>
                                     <div className='waitingSpinnerRing'><div/><div/><div/><div/></div>
-                                    <p>Waiting for host to restart the game...</p>
+                                    <p>Waiting for host to restart...</p>
                                 </div>
                             )}
                         </div>

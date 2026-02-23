@@ -1031,111 +1031,193 @@ a {
   }
 }
 
-/* ── Game-over screen ────────────────────────────────────────────── */
+/* ── Game-over / Winner screen ──────────────────────────────────── */
 .gameOverScreen {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  margin: 30px auto 0;
-  padding: 40px 36px 36px;
+  margin: 20px auto 0;
+  padding: 28px 20px 24px;
+  width: calc(100% - 40px);
   max-width: 400px;
-  background: linear-gradient(160deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.38) 100%);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 2px solid rgba(255,255,255,0.22);
+  background: linear-gradient(160deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.44) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 2px solid rgba(255,255,255,0.18);
   border-radius: 24px;
-  box-shadow: 0 12px 48px rgba(0,0,0,0.45);
+  box-shadow: 0 12px 48px rgba(0,0,0,0.5);
   text-align: center;
+  box-sizing: border-box;
   animation: waitingFadeIn 0.4s ease;
 }
 
-.gameOverScreen h1 {
+/* Trophy */
+.goTrophy {
   font-size: 3rem;
+  line-height: 1;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 4px 14px rgba(255,200,0,0.65));
+  animation: trophyPop 0.5s cubic-bezier(0.175,0.885,0.32,1.275) both;
+}
+@keyframes trophyPop {
+  0%   { transform: scale(0.3); opacity: 0; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+/* "CONGRATULATIONS!" */
+.goCongrats {
+  font-family: sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.55);
+  margin: 0 0 6px;
+}
+
+/* Winner name */
+.goWinnerName {
+  font-size: 2.4rem;
+  font-style: italic;
+  font-weight: 900;
   color: #ffe04b;
-  margin: 0 0 12px;
-  text-shadow: 0 0 20px rgba(255,224,75,0.7);
-  letter-spacing: 3px;
+  margin: 0 0 4px;
+  text-shadow: 0 0 28px rgba(255,224,75,0.7);
+  word-break: break-word;
+  line-height: 1.1;
 }
 
-.gameOverScreen h2 {
-  font-size: 1.5rem;
-  color: #fff;
+/* "wins the game!" */
+.goSubtitle {
+  font-family: sans-serif;
+  font-size: 1rem;
+  color: rgba(255,255,255,0.75);
   margin: 0;
-  font-family: sans-serif;
-  font-weight: bold;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
 }
 
-/* Player badges on game-over screen */
-.gameOverPlayers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  margin: 18px 0 0;
-}
-
-.gameOverPlayerBadge {
-  padding: 5px 14px;
-  border-radius: 20px;
+/* Divider */
+.goDivider {
+  width: 100%;
+  height: 1px;
   background: rgba(255,255,255,0.15);
-  color: #fff;
-  font-size: 0.9rem;
-  font-family: sans-serif;
-  border: 1px solid rgba(255,255,255,0.25);
+  margin: 18px 0 12px;
+  border-radius: 1px;
 }
 
-.gameOverPlayerBadge.gameOverWinner {
+/* "X / 10 PLAYERS" */
+.goPlayersLabel {
+  font-family: sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.42);
+  margin: 0 0 10px;
+}
+
+/* Player rows */
+.goPlayerList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.goPlayerItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-sizing: border-box;
+}
+
+.goPlayerItem.goPlayerItemWin {
+  background: linear-gradient(135deg, rgba(255,224,75,0.16), rgba(247,166,0,0.12));
+  border-color: rgba(255,224,75,0.4);
+}
+
+.goPlayerName {
+  font-family: sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  text-align: left;
+}
+
+.goBadges {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.goBadgeHost {
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 3px 11px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.3);
+  font-family: sans-serif;
+}
+
+.goBadgeWinner {
   background: linear-gradient(135deg, #ffe04b, #f7a600);
   color: #1a1a1a;
-  font-weight: bold;
-  border: none;
-  box-shadow: 0 2px 12px rgba(255,212,0,0.5);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 3px 11px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(255,200,0,0.45);
+  font-family: sans-serif;
 }
 
 /* Restart button */
 .restartBtn {
-  margin-top: 22px !important;
+  margin-top: 20px !important;
   width: 100%;
-  font-size: 1.1rem !important;
-  padding: 12px 0 !important;
+  font-size: 1.05rem !important;
+  padding: 13px 0 !important;
+  border-radius: 14px !important;
 }
 
-/* Non-host waiting message on game-over screen */
+/* Non-host waiting */
 .waitingRestart {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  margin-top: 22px;
+  margin-top: 20px;
 }
 
 .waitingRestart p {
-  color: #ccc;
+  color: rgba(255,255,255,0.5);
   font-family: sans-serif;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   margin: 0;
   text-align: center;
 }
 
 @media (max-width: 480px) {
   .gameOverScreen {
-    max-width: calc(100vw - 32px);
-    padding: 28px 18px;
-    margin: 16px auto 0;
+    width: calc(100vw - 32px);
+    padding: 22px 14px 20px;
+    margin: 14px auto 0;
+    border-radius: 20px;
   }
 
-  .gameOverScreen h1 {
-    font-size: 2.2rem;
-  }
-
-  .gameOverScreen h2 {
-    font-size: 1.2rem;
-  }
+  .goTrophy     { font-size: 2.5rem; }
+  .goWinnerName { font-size: 2rem; }
 
   .restartBtn {
-    font-size: 1rem !important;
+    font-size: 0.97rem !important;
+    padding: 12px 0 !important;
   }
 }
 
