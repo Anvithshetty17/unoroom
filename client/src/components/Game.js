@@ -556,7 +556,7 @@ const Game = (props) => {
                                             try {
                                                 await navigator.share({
                                                     title: 'Join my UNO game!',
-                                                    text: `Join my UNO room — just enter your name and play! 🎴`,
+                                                    text: `Join my UNO ROOM — just enter your name and play! 🎴`,
                                                     url: link
                                                 })
                                             } catch (_) {}
