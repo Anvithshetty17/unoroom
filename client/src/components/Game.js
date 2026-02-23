@@ -384,13 +384,29 @@ const Game = (props) => {
                                                 navigator.clipboard.writeText(room).then(() => {
                                                     btn.textContent = 'Copied!'
                                                     setTimeout(() => { btn.textContent = 'Copy' }, 1500)
-                                                }).catch(() => {
-                                                    btn.textContent = 'Copy'
-                                                })
+                                                }).catch(() => { btn.textContent = 'Copy' })
                                             }} title='Copy code'>Copy</button>
                                         </div>
                                     </div>
-                                    <p className='waitingHint'>Share the code, then press Start when everyone is in</p>
+                                    <button className='shareLinkBtn' onClick={async (e) => {
+                                        const btn = e.currentTarget
+                                        const link = `${window.location.origin}/join/${room}`
+                                        if (navigator.share) {
+                                            try {
+                                                await navigator.share({
+                                                    title: 'Join my UNO game!',
+                                                    text: `Join my UNO room — just enter your name and play! 🎴`,
+                                                    url: link
+                                                })
+                                            } catch (_) {}
+                                        } else {
+                                            navigator.clipboard.writeText(link).then(() => {
+                                                btn.textContent = '✅ Link Copied!'
+                                                setTimeout(() => { btn.textContent = '🔗 Share Invite Link' }, 2000)
+                                            }).catch(() => {})
+                                        }
+                                    }}>🔗 Share Invite Link</button>
+                                    <p className='waitingHint'>Share the link or code, then press Start</p>
                                     <button
                                         className={`game-button ${users.length >= 2 ? 'green' : ''}`}
                                         disabled={users.length < 2}
