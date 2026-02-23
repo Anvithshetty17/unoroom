@@ -17,6 +17,8 @@ const MAX_PLAYERS = 10
 
 const Game = (props) => {
     const socketRef = useRef(null)
+    const localStreamRef       = useRef(null)     // local mic MediaStream
+    const peerConnectionsRef   = useRef({})        // { [socketId]: RTCPeerConnection }
     const data = queryString.parse(props.location.search)
     const _searchParams  = new URLSearchParams(props.location.search)
 
@@ -48,6 +50,10 @@ const Game = (props) => {
     const [emojiReactions, setEmojiReactions] = useState([]) // [{id, name, emoji}]
     const [pressedEmoji, setPressedEmoji]     = useState(null)
 
+    const [voiceActive, setVoiceActive]   = useState(false)
+    const [isMuted, setIsMuted]           = useState(false)
+    const [voicePeers, setVoicePeers]     = useState({}) // { [socketId]: peerName }
+
     const [playUnoSound]       = useSound(unoSound)
     const [playShufflingSound] = useSound(shufflingSound)
     const [playSkipCardSound]  = useSound(skipCardSound)
@@ -67,7 +73,16 @@ const Game = (props) => {
         socket.emit('join', { room, name: data.name || '' }, (error) => {
             if (error) setRoomFull(true)
         })
-        return () => { socket.disconnect(); socket.off() }
+        return () => {
+            Object.values(peerConnectionsRef.current).forEach(pc => pc.close())
+            Object.keys(peerConnectionsRef.current).forEach(id => {
+                const a = document.getElementById('voice-audio-' + id)
+                if (a) a.remove()
+            })
+            if (localStreamRef.current) localStreamRef.current.getTracks().forEach(t => t.stop())
+            socket.disconnect()
+            socket.off()
+        }
     }, [])
 
     useEffect(() => {
@@ -122,6 +137,53 @@ const Game = (props) => {
             setEmojiReactions(prev => [...prev, { id, name, emoji }])
             setTimeout(() => setEmojiReactions(prev => prev.filter(r => r.id !== id)), 2600)
         })
+
+        // ── WebRTC Voice Chat ─────────────────────────────────────────
+        socket.on('voiceExistingPeers', async (peers) => {
+            for (const { peerId, peerName } of peers) {
+                const pc = createPeerConnection(peerId, peerName)
+                try {
+                    const offer = await pc.createOffer()
+                    await pc.setLocalDescription(offer)
+                    socket.emit('voiceOffer', { targetId: peerId, offer })
+                } catch (err) { console.error('Voice offer error:', err) }
+            }
+        })
+
+        socket.on('voicePeerJoined', ({ peerId, peerName }) => {
+            createPeerConnection(peerId, peerName)
+        })
+
+        socket.on('voiceOffer', async ({ peerId, offer }) => {
+            let pc = peerConnectionsRef.current[peerId]
+            if (!pc) pc = createPeerConnection(peerId, 'Unknown')
+            try {
+                await pc.setRemoteDescription(new RTCSessionDescription(offer))
+                const answer = await pc.createAnswer()
+                await pc.setLocalDescription(answer)
+                socket.emit('voiceAnswer', { targetId: peerId, answer })
+            } catch (err) { console.error('Voice answer error:', err) }
+        })
+
+        socket.on('voiceAnswer', async ({ peerId, answer }) => {
+            const pc = peerConnectionsRef.current[peerId]
+            if (pc) {
+                try { await pc.setRemoteDescription(new RTCSessionDescription(answer)) }
+                catch (_) {}
+            }
+        })
+
+        socket.on('voiceIceCandidate', async ({ peerId, candidate }) => {
+            const pc = peerConnectionsRef.current[peerId]
+            if (pc) {
+                try { await pc.addIceCandidate(new RTCIceCandidate(candidate)) }
+                catch (_) {}
+            }
+        })
+
+        socket.on('voicePeerLeft', ({ peerId }) => {
+            closePeerConnection(peerId)
+        })
     }, [])
 
     const nextPlayer = (currentTurn, dir, playerList, skip = 0) => {
@@ -155,6 +217,78 @@ const Game = (props) => {
     const startGame = () => {
         if (!isHost || users.length < 2) return
         socketRef.current && socketRef.current.emit('startGame')
+    }
+
+    // ── WebRTC Voice Chat helpers ─────────────────────────────────
+    const createPeerConnection = (peerId, peerName) => {
+        const pc = new RTCPeerConnection({ iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+        ]})
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(track =>
+                pc.addTrack(track, localStreamRef.current)
+            )
+        }
+        pc.ontrack = (e) => {
+            const audioId = 'voice-audio-' + peerId
+            let audio = document.getElementById(audioId)
+            if (!audio) {
+                audio = document.createElement('audio')
+                audio.id = audioId
+                audio.autoplay = true
+                document.body.appendChild(audio)
+            }
+            audio.srcObject = e.streams[0]
+        }
+        pc.onicecandidate = (e) => {
+            if (e.candidate && socketRef.current) {
+                socketRef.current.emit('voiceIceCandidate', { targetId: peerId, candidate: e.candidate })
+            }
+        }
+        peerConnectionsRef.current[peerId] = pc
+        setVoicePeers(prev => ({ ...prev, [peerId]: peerName }))
+        return pc
+    }
+
+    const closePeerConnection = (peerId) => {
+        if (peerConnectionsRef.current[peerId]) {
+            peerConnectionsRef.current[peerId].close()
+            delete peerConnectionsRef.current[peerId]
+        }
+        const audio = document.getElementById('voice-audio-' + peerId)
+        if (audio) audio.remove()
+        setVoicePeers(prev => { const n = { ...prev }; delete n[peerId]; return n })
+    }
+
+    const joinVoice = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+            localStreamRef.current = stream
+            setVoiceActive(true)
+            socketRef.current && socketRef.current.emit('joinVoice')
+        } catch (_) {
+            alert('Microphone access denied. Please allow microphone to use voice chat.')
+        }
+    }
+
+    const leaveVoice = () => {
+        Object.keys(peerConnectionsRef.current).forEach(id => closePeerConnection(id))
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(t => t.stop())
+            localStreamRef.current = null
+        }
+        socketRef.current && socketRef.current.emit('leaveVoice')
+        setVoiceActive(false)
+        setIsMuted(false)
+        setVoicePeers({})
+    }
+
+    const toggleMute = () => {
+        if (localStreamRef.current) {
+            const track = localStreamRef.current.getAudioTracks()[0]
+            if (track) { track.enabled = !track.enabled; setIsMuted(!track.enabled) }
+        }
     }
 
     const onCardPlayedHandler = (played_card) => {
@@ -628,6 +762,19 @@ onClick={() => { setUnoButtonPressed(!isUnoButtonPressed); playUnoSound(); if (!
                     </div>
                 ))}
             </div>
+
+            {/* Voice Chat — only during active game */}
+            {!gameOver && (
+            <div className='voiceContainer'>
+                <button
+                    className={`voiceMicBtn${voiceActive ? (isMuted ? ' voiceMicMuted' : ' voiceMicActive') : ''}`}
+                    onClick={voiceActive ? toggleMute : joinVoice}
+                    title={!voiceActive ? 'Join voice chat' : isMuted ? 'Unmute' : 'Mute'}
+                >
+                    {voiceActive ? (isMuted ? '🔇' : '🎙️') : '🎙️'}
+                </button>
+            </div>
+            )}
 
             {colorPickerVisible && (
                 <div className='colorPickerOverlay'>

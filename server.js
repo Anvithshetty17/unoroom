@@ -46,6 +46,7 @@ setInterval(async () => {
 const app = express()
 const server = http.createServer(app)
 const io = socketio(server)
+const voiceRooms = {} // roomCode -> Set<socketId> of voice participants
 
 app.use(cors())
 
@@ -287,6 +288,46 @@ io.on('connection', socket => {
         }
     })
 
+    // ── WebRTC Voice Chat Signaling ──────────────────────────────────
+    socket.on('joinVoice', () => {
+        const user = getUser(socket.id)
+        if (!user) return
+        if (!voiceRooms[user.room]) voiceRooms[user.room] = new Set()
+        const existingPeerIds = [...voiceRooms[user.room]]
+        // Tell joining peer about everyone already in voice
+        socket.emit('voiceExistingPeers', existingPeerIds.map(id => {
+            const u = getUser(id)
+            return { peerId: id, peerName: u ? u.name : 'Unknown' }
+        }))
+        // Tell existing voice peers about the new joiner
+        existingPeerIds.forEach(id => {
+            io.to(id).emit('voicePeerJoined', { peerId: socket.id, peerName: user.name })
+        })
+        voiceRooms[user.room].add(socket.id)
+    })
+
+    socket.on('leaveVoice', () => {
+        const user = getUser(socket.id)
+        if (!user) return
+        if (voiceRooms[user.room]) {
+            voiceRooms[user.room].delete(socket.id)
+            if (voiceRooms[user.room].size === 0) delete voiceRooms[user.room]
+        }
+        socket.to(user.room).emit('voicePeerLeft', { peerId: socket.id })
+    })
+
+    socket.on('voiceOffer', ({ targetId, offer }) => {
+        io.to(targetId).emit('voiceOffer', { peerId: socket.id, offer })
+    })
+
+    socket.on('voiceAnswer', ({ targetId, answer }) => {
+        io.to(targetId).emit('voiceAnswer', { peerId: socket.id, answer })
+    })
+
+    socket.on('voiceIceCandidate', ({ targetId, candidate }) => {
+        io.to(targetId).emit('voiceIceCandidate', { peerId: socket.id, candidate })
+    })
+
     socket.on('sendMessage', async (payload, callback) => {
         const user = getUser(socket.id)
         if (!user) return
@@ -315,6 +356,13 @@ io.on('connection', socket => {
     socket.on('disconnect', async () => {
         const user = removeUser(socket.id)
         if (user) {
+            // Voice cleanup on disconnect
+            if (voiceRooms[user.room]) {
+                voiceRooms[user.room].delete(socket.id)
+                if (voiceRooms[user.room].size === 0) delete voiceRooms[user.room]
+            }
+            io.to(user.room).emit('voicePeerLeft', { peerId: socket.id })
+
             const remaining = getUsersInRoom(user.room)
             io.to(user.room).emit('roomData', { room: user.room, users: remaining })
 
