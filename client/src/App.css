@@ -345,6 +345,59 @@ a {
   display: none;
 }
 
+/* ── Emoji reaction bar — hidden on desktop, shown via media query ── */
+.emojiBar {
+  display: none;
+}
+
+/* ── Floating emoji reactions ──────────────────────────────────────── */
+.emojiReactionArea {
+  position: fixed;
+  /* sits just above the topmost emoji button on mobile (108 + 148 + 8) */
+  bottom: 264px;
+  right: 16px;
+  z-index: 300;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  pointer-events: none;
+  align-items: flex-end;
+}
+
+.emojiReactionFloat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 24px;
+  padding: 6px 14px 6px 8px;
+  animation: emojiFloatUp 2.6s ease-in-out forwards;
+}
+
+.emojiReactionEmoji {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.emojiReactionName {
+  font-family: sans-serif;
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.9);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@keyframes emojiFloatUp {
+  0%   { opacity: 0;   transform: translateY(20px) scale(0.7); }
+  12%  { opacity: 1;   transform: translateY(0)    scale(1.1); }
+  20%  { opacity: 1;   transform: scale(1); }
+  55%  { opacity: 1;   transform: translateY(-12px); }
+  100% { opacity: 0;   transform: translateY(-44px); }
+}
+
 .middleInfo>button {
   align-self: center;
 }
@@ -967,6 +1020,50 @@ a {
   .unoFixedBtn::after {
     display: none;
   }
+
+  /* Emoji bar — 3 buttons fixed above UNO button */
+  .emojiBar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: fixed;
+    bottom: 108px;
+    right: 16px;
+    z-index: 200;
+  }
+
+  .emojiBtn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 2px solid rgba(255,255,255,0.3);
+    font-size: 1.35rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s ease, background 0.15s;
+    padding: 0;
+  }
+
+  .emojiBtn:active {
+    transform: scale(0.88);
+  }
+
+  .emojiBtn--pop {
+    animation: emojiBtnPop 0.35s cubic-bezier(0.175,0.885,0.32,1.275);
+  }
+
+  @keyframes emojiBtnPop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.45); }
+    70%  { transform: scale(0.9); }
+    100% { transform: scale(1); }
+  }
 }
 
 @media (max-width: 480px) {
@@ -991,6 +1088,23 @@ a {
     width: 62px;
     height: 62px;
     font-size: 1rem !important;
+  }
+
+  .emojiBar {
+    bottom: 90px;
+    right: 12px;
+  }
+
+  .emojiBtn {
+    width: 48px;
+    height: 48px;
+    font-size: 1.2rem;
+  }
+
+  /* reaction area above top emoji button (90 + 3*48 + 2*8 + 8) */
+  .emojiReactionArea {
+    bottom: 258px;
+    right: 12px;
   }
 }
 

@@ -280,6 +280,13 @@ io.on('connection', socket => {
         }
     })
 
+    socket.on('emojiReaction', ({ emoji }) => {
+        const user = getUser(socket.id)
+        if (user) {
+            io.to(user.room).emit('emojiReaction', { name: user.name, emoji })
+        }
+    })
+
     socket.on('sendMessage', async (payload, callback) => {
         const user = getUser(socket.id)
         if (!user) return

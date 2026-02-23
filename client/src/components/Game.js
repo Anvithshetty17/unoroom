@@ -45,6 +45,8 @@ const Game = (props) => {
     const [drawnCardKey, setDrawnCardKey] = useState(null)  // which card was drawn
     const [stackPenalty, setStackPenalty] = useState(0)      // accumulated +2/+4 penalty
     const [stackType, setStackType]       = useState(null)   // 'D2' or 'D4' — last stack card type
+    const [emojiReactions, setEmojiReactions] = useState([]) // [{id, name, emoji}]
+    const [pressedEmoji, setPressedEmoji]     = useState(null)
 
     const [playUnoSound]       = useSound(unoSound)
     const [playShufflingSound] = useSound(shufflingSound)
@@ -113,6 +115,12 @@ const Game = (props) => {
 
         socket.on('unoAnnouncement', ({ name }) => {
             showToast(`🎴 ${name} said UNO!`, 'info')
+        })
+
+        socket.on('emojiReaction', ({ name, emoji }) => {
+            const id = Date.now() + Math.random()
+            setEmojiReactions(prev => [...prev, { id, name, emoji }])
+            setTimeout(() => setEmojiReactions(prev => prev.filter(r => r.id !== id)), 2600)
         })
     }, [])
 
@@ -549,6 +557,21 @@ const Game = (props) => {
                                 </div>
                             </div>
 
+                            {/* Emoji reaction bar — fixed above UNO button, mobile only */}
+                            <div className='emojiBar'>
+                                {['😂','😤','😢'].map(em => (
+                                    <button
+                                        key={em}
+                                        className={`emojiBtn${pressedEmoji === em ? ' emojiBtn--pop' : ''}`}
+                                        onClick={() => {
+                                            socketRef.current && socketRef.current.emit('emojiReaction', { emoji: em })
+                                            setPressedEmoji(em)
+                                            setTimeout(() => setPressedEmoji(null), 350)
+                                        }}
+                                    >{em}</button>
+                                ))}
+                            </div>
+
                             {/* Mobile UNO button — fixed bottom-right */}
                             <button className='game-button orange unoFixedBtn'
                                 disabled={myCards.length !== 2}
@@ -595,6 +618,16 @@ onClick={() => { setUnoButtonPressed(!isUnoButtonPressed); playUnoSound(); if (!
                     {toast.msg}
                 </div>
             )}
+
+            {/* Floating emoji reactions */}
+            <div className='emojiReactionArea'>
+                {emojiReactions.map(r => (
+                    <div key={r.id} className='emojiReactionFloat'>
+                        <span className='emojiReactionEmoji'>{r.emoji}</span>
+                        <span className='emojiReactionName'>{r.name}</span>
+                    </div>
+                ))}
+            </div>
 
             {colorPickerVisible && (
                 <div className='colorPickerOverlay'>
