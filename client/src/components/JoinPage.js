@@ -4,11 +4,13 @@ import { useHistory, useParams } from 'react-router-dom'
 const JoinPage = () => {
     const { roomCode } = useParams()
     const history = useHistory()
-    const [playerName, setPlayerName] = useState('')
+    // pre-fill from localStorage if returning user
+    const [playerName, setPlayerName] = useState(() => localStorage.getItem('uno_player_name') || '')
 
     const handleJoin = () => {
         const name = playerName.trim()
         if (!name) return
+        localStorage.setItem('uno_player_name', name)
         history.push(`/play?roomCode=${roomCode}&name=${encodeURIComponent(name)}`)
     }
 
