@@ -208,6 +208,18 @@ const Game = (props) => {
         setColorPickerCallback(prev => { if (prev) prev(color); return null })
     }
 
+    // Auto-join voice when game starts, leave when game ends
+    useEffect(() => {
+        if (!gameOver && winner === '') {
+            // game just started — join voice muted
+            if (!voiceActive) joinVoice()
+        } else {
+            // game over / lobby — leave voice
+            if (voiceActive) leaveVoice()
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [gameOver])
+
     const showToast = (msg, type = 'info') => {
         setToast({ msg, type })
         setTimeout(() => setToast(null), 3000)
@@ -264,11 +276,18 @@ const Game = (props) => {
     const joinVoice = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+            // start muted — user must press button to unmute
+            stream.getAudioTracks().forEach(t => { t.enabled = false })
             localStreamRef.current = stream
+            setIsMuted(true)
             setVoiceActive(true)
             socketRef.current && socketRef.current.emit('joinVoice')
         } catch (_) {
-            alert('Microphone access denied. Please allow microphone to use voice chat.')
+            // mic denied — still join as listener (speaker always on)
+            localStreamRef.current = null
+            setIsMuted(true)
+            setVoiceActive(true)
+            socketRef.current && socketRef.current.emit('joinVoice')
         }
     }
 
@@ -768,10 +787,10 @@ onClick={() => { setUnoButtonPressed(!isUnoButtonPressed); playUnoSound(); if (!
             <div className='voiceContainer'>
                 <button
                     className={`voiceMicBtn${voiceActive ? (isMuted ? ' voiceMicMuted' : ' voiceMicActive') : ''}`}
-                    onClick={voiceActive ? toggleMute : joinVoice}
-                    title={!voiceActive ? 'Join voice chat' : isMuted ? 'Unmute' : 'Mute'}
+                    onClick={toggleMute}
+                    title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
                 >
-                    {voiceActive ? (isMuted ? '🔇' : '🎙️') : '🎙️'}
+                    {isMuted ? '🔇' : '🎙️'}
                 </button>
             </div>
             )}
