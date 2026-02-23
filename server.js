@@ -49,6 +49,23 @@ const io = socketio(server)
 const voiceRooms = {} // roomCode -> Set<socketId> of voice participants
 
 app.use(cors())
+app.use(express.json())
+
+// ── Admin: clear all DB data ──────────────────────────────────────────────────
+// Visit: /admin/clear-db?secret=YOUR_SECRET
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'uno-clear-2024'
+app.get('/admin/clear-db', async (req, res) => {
+    if (req.query.secret !== ADMIN_SECRET) {
+        return res.status(403).json({ error: 'Forbidden — wrong secret' })
+    }
+    try {
+        const result = await GameRoom.deleteMany({})
+        return res.json({ ok: true, deleted: result.deletedCount, message: `Deleted ${result.deletedCount} room(s) from DB` })
+    } catch (err) {
+        return res.status(500).json({ error: err.message })
+    }
+})
+// ─────────────────────────────────────────────────────────────────────────────
 
 io.on('connection', socket => {
     socket.on('join', async (payload, callback) => {
