@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import shuffleArray from '../utils/shuffleArray'
 import io from 'socket.io-client'
 import queryString from 'query-string'
@@ -12,11 +12,11 @@ import wildCardSound from '../assets/sounds/wild-sound.mp3'
 import draw4CardSound from '../assets/sounds/draw4-sound.mp3'
 import gameOverSound from '../assets/sounds/game-over-sound.mp3'
 
-let socket
 const ENDPOINT = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000'
 const MAX_PLAYERS = 10
 
 const Game = (props) => {
+    const socketRef = useRef(null)
     const data = queryString.parse(props.location.search)
     const _searchParams  = new URLSearchParams(props.location.search)
 
@@ -55,21 +55,24 @@ const Game = (props) => {
     const [playGameOverSound]  = useSound(gameOverSound)
 
     useEffect(() => {
-        socket = io.connect(ENDPOINT, {
+        const socket = io.connect(ENDPOINT, {
             forceNew: true,
             reconnectionAttempts: 'Infinity',
             timeout: 10000,
             transports: ['websocket']
         })
+        socketRef.current = socket
         socket.emit('join', { room, name: data.name || '' }, (error) => {
             if (error) setRoomFull(true)
         })
-        return () => { socket.emit('disconnect'); socket.off() }
+        return () => { socket.disconnect(); socket.off() }
     }, [])
 
     useEffect(() => {
+        const socket = socketRef.current
         socket.on('initGameState', (state) => {
             setGameOver(state.gameOver)
+            setWinner(state.winner || '')
             setTurn(state.turn || '')
             setDirection(state.direction || 1)
             setPlayers(state.players || [])
@@ -80,6 +83,10 @@ const Game = (props) => {
             setDrawCardPile(state.drawCardPile || [])
             setStackPenalty(state.stackPenalty || 0)
             setStackType(state.stackType || null)
+            // reset per-turn UI state when a new game starts
+            setHasDrawn(false)
+            setDrawnCardKey(null)
+            setUnoButtonPressed(false)
         })
 
         socket.on('updateGameState', (state) => {
@@ -139,7 +146,7 @@ const Game = (props) => {
     // Server handles all deck creation / shuffling to avoid stale closure bugs
     const startGame = () => {
         if (!isHost || users.length < 2) return
-        socket.emit('startGame')
+        socketRef.current && socketRef.current.emit('startGame')
     }
 
     const onCardPlayedHandler = (played_card) => {
@@ -195,7 +202,7 @@ const Game = (props) => {
         if (isWild) {
             showColorPicker((newColor) => {
                 playWildCardSound()
-                socket.emit('updateGameState', {
+                socketRef.current && socketRef.current.emit('updateGameState', {
                     ...base,
                     currentColor: newColor,
                     currentNumber: 300,
@@ -208,7 +215,7 @@ const Game = (props) => {
             showColorPicker((newColor) => {
                 playDraw4CardSound()
                 const newPenalty = stackPenalty + 4
-                socket.emit('updateGameState', {
+                socketRef.current && socketRef.current.emit('updateGameState', {
                     ...base,
                     currentColor: newColor, currentNumber: 600,
                     stackPenalty: newPenalty,
@@ -220,7 +227,7 @@ const Game = (props) => {
 
         if (isSkip) {
             playSkipCardSound()
-            socket.emit('updateGameState', {
+            socketRef.current && socketRef.current.emit('updateGameState', {
                 ...base,
                 currentColor: cardColor, currentNumber: 404,
                 turn: isWinner ? turn : nextPlayer(currentUser, direction, players, 1)
@@ -232,7 +239,7 @@ const Game = (props) => {
             const newTurn = isWinner ? turn
                 : (players.length === 2 ? currentUser : nextPlayer(currentUser, newDir, players))
             playShufflingSound()
-            socket.emit('updateGameState', {
+            socketRef.current && socketRef.current.emit('updateGameState', {
                 ...base,
                 currentColor: cardColor, currentNumber: '_',
                 direction: newDir, turn: newTurn
@@ -242,7 +249,7 @@ const Game = (props) => {
         if (isDraw2) {
             playDraw2CardSound()
             const newPenalty = stackPenalty + 2
-            socket.emit('updateGameState', {
+            socketRef.current && socketRef.current.emit('updateGameState', {
                 ...base,
                 currentColor: cardColor, currentNumber: 252,
                 stackPenalty: newPenalty,
@@ -252,7 +259,7 @@ const Game = (props) => {
         }
 
         playShufflingSound()
-        socket.emit('updateGameState', {
+        socketRef.current && socketRef.current.emit('updateGameState', {
             ...base,
             currentColor: cardColor, currentNumber: cardNum,
             turn: isWinner ? turn : nextPlayer(currentUser, direction, players)
@@ -300,7 +307,7 @@ const Game = (props) => {
         if (!hasDrawn) return
         setHasDrawn(false)
         setDrawnCardKey(null)
-        socket.emit('updateGameState', {
+        socketRef.current && socketRef.current.emit('updateGameState', {
             playerDecks,
             playedCardsPile,
             drawCardPile,
@@ -322,7 +329,7 @@ const Game = (props) => {
         }
         const newDecks = { ...playerDecks, [currentUser]: myNewCards }
         playDraw2CardSound()
-        socket.emit('updateGameState', {
+        socketRef.current && socketRef.current.emit('updateGameState', {
             playerDecks: newDecks,
             drawCardPile: copiedDraw,
             playedCardsPile,
@@ -405,7 +412,28 @@ const Game = (props) => {
                     {gameOver && winner !== '' && (
                         <div className='gameOverScreen'>
                             <h1>GAME OVER</h1>
-                            <h2>{winner} wins!</h2>
+                            <h2>{winner} wins! 🎉</h2>
+                            <div className='gameOverPlayers'>
+                                {users.map((u, idx) => (
+                                    <span key={u.name} className={`gameOverPlayerBadge${u.name === winner ? ' gameOverWinner' : ''}`}>
+                                        {u.name === winner ? '👑 ' : ''}{u.name}
+                                        {idx === 0 && u.name !== winner ? ' (host)' : ''}
+                                    </span>
+                                ))}
+                            </div>
+                            {isHost ? (
+                                <button
+                                    className='game-button green restartBtn'
+                                    onClick={() => socketRef.current && socketRef.current.emit('restartGame')}
+                                >
+                                    🔄 Play Again
+                                </button>
+                            ) : (
+                                <div className='waitingRestart'>
+                                    <div className='waitingSpinnerRing'><div/><div/><div/><div/></div>
+                                    <p>Waiting for host to restart the game...</p>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -443,7 +471,7 @@ const Game = (props) => {
                                 <div className='middleButtons'>
                                     <button className='game-button orange'
                                         disabled={myCards.length !== 2}
-                                        onClick={() => { setUnoButtonPressed(!isUnoButtonPressed); playUnoSound(); if (!isUnoButtonPressed) socket.emit('unoAnnouncement', { name: currentUser }) }}>  
+                                        onClick={() => { setUnoButtonPressed(!isUnoButtonPressed); playUnoSound(); if (!isUnoButtonPressed) socketRef.current && socketRef.current.emit('unoAnnouncement', { name: currentUser }) }}>  
                                         UNO
                                     </button>
                                     {stackPenalty > 0 ? (
@@ -495,7 +523,7 @@ const Game = (props) => {
                             {/* Mobile UNO button — fixed bottom-right */}
                             <button className='game-button orange unoFixedBtn'
                                 disabled={myCards.length !== 2}
-                                onClick={() => { setUnoButtonPressed(!isUnoButtonPressed); playUnoSound(); if (!isUnoButtonPressed) socket.emit('unoAnnouncement', { name: currentUser }) }}>
+onClick={() => { setUnoButtonPressed(!isUnoButtonPressed); playUnoSound(); if (!isUnoButtonPressed) socketRef.current && socketRef.current.emit('unoAnnouncement', { name: currentUser }) }}>  
                                 UNO
                             </button>
 

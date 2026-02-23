@@ -168,6 +168,55 @@ io.on('connection', socket => {
         }
     })
 
+    // ── Restart Game (host only — reuses all current room members) ─────────
+    socket.on('restartGame', async () => {
+        const user = getUser(socket.id)
+        if (!user || !user.isHost) return
+        const roomUsers = getUsersInRoom(user.room)
+        if (roomUsers.length < 2) return
+
+        const playerList = roomUsers.map(u => u.name)
+        const shuffled   = shuffleArray([...PACK_OF_CARDS])
+        const decks = {}
+        playerList.forEach(p => { decks[p] = shuffled.splice(0, 7) })
+
+        let si
+        while (true) {
+            si = Math.floor(Math.random() * shuffled.length)
+            if (!ACTION_CARDS.includes(shuffled[si])) break
+        }
+        const startCard  = shuffled.splice(si, 1)[0]
+        const startColor = startCard[startCard.length - 1]
+        const startNum   = startCard[0]
+
+        const gameState = {
+            gameOver: false,
+            winner: '',
+            turn: playerList[0],
+            direction: 1,
+            players: playerList,
+            playerDecks: decks,
+            currentColor: startColor,
+            currentNumber: startNum,
+            playedCardsPile: [startCard],
+            drawCardPile: shuffled
+        }
+
+        io.to(user.room).emit('initGameState', gameState)
+
+        if (isDBConnected()) {
+            try {
+                await GameRoom.findOneAndUpdate(
+                    { room: user.room },
+                    { $set: { ...gameState, room: user.room, lastActivity: Date.now() } },
+                    { upsert: true, new: true }
+                )
+            } catch (err) {
+                console.error('Error saving restarted game state:', err)
+            }
+        }
+    })
+
     socket.on('initGameState', async gameState => {
         const user = getUser(socket.id)
         if (user) {
