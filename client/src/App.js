@@ -6,10 +6,13 @@ import JoinPage from './components/JoinPage'
 
 const App = () => {
   return (
-    <div className="App">
-      <Route path='/' exact component={Homepage} />
-      <Route path='/play' exact component={Game} />
-      <Route path='/join/:roomCode' exact component={JoinPage} />
+    <div className="app-outer">
+      <div className="app-backdrop" />
+      <div className="App">
+        <Route path='/' exact component={Homepage} />
+        <Route path='/play' exact component={Game} />
+        <Route path='/join/:roomCode' exact component={JoinPage} />
+      </div>
     </div>
   )
 }

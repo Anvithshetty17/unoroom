@@ -1,5 +1,38 @@
+/* ── Desktop wrapper: centers mobile view with blurred sides ── */
+.app-outer {
+  position: relative;
+  width: 100vw;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow: hidden;
+  background: #0d0d0d;
+}
+
+.app-backdrop {
+  position: fixed;
+  inset: -30px;
+  background:
+    url('./assets/backgrounds/bgR.png') center / cover no-repeat;
+  filter: blur(28px) brightness(0.35) saturate(1.4);
+  z-index: 0;
+  pointer-events: none;
+}
+
 .App {
   text-align: center;
+  max-width: 480px;
+  width: 100%;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  box-shadow: 0 0 60px rgba(0,0,0,0.8);
+  /* Makes .App the containing block for all position:fixed children,
+     so buttons/reactions snap to the mobile panel edges, not the viewport */
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 a {
@@ -1670,17 +1703,23 @@ html, body {
     transform: translateX(-50%);
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 10px;
-    padding: 12px 22px;
+    padding: 12px 18px;
     border-radius: 50px;
     font-family: 'Carter One', sans-serif;
-    font-size: 1rem;
+    font-size: 0.88rem;
     color: #fff;
     pointer-events: none;
     z-index: 9999;
     animation: toastIn 0.3s ease, toastOut 0.4s ease 2.6s forwards;
     box-shadow: 0 4px 20px rgba(0,0,0,0.35);
-    white-space: nowrap;
+    white-space: normal;
+    word-break: break-word;
+    text-align: center;
+    width: calc(100% - 32px);
+    max-width: 440px;
+    box-sizing: border-box;
 }
 .gameToast--info  { background: rgba(30,30,60,0.92); border: 2px solid rgba(100,160,255,0.6); }
 .gameToast--warn  { background: rgba(180,50,20,0.93); border: 2px solid rgba(255,120,60,0.7); }
@@ -1926,3 +1965,237 @@ html, body {
     .voiceMicBtn { width: 46px; height: 46px; font-size: 1.2rem; }
     .voiceContainer { top: 10px; right: 12px; }
 }
+
+/* ================================================================
+   FORCE MOBILE LAYOUT INSIDE .App (480px panel) — applies always
+   regardless of viewport width so desktop shows mobile UI correctly
+   ================================================================ */
+
+/* Game wrapper */
+.App .Game {
+  height: auto;
+  min-height: 100vh;
+  overflow-x: hidden;
+  padding-bottom: 20px;
+  box-sizing: border-box;
+}
+
+/* Top bar */
+.App .topInfo {
+  padding: 0 6px;
+  height: auto;
+  min-height: 56px;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+.App .topInfo > img {
+  width: 36px !important;
+  flex-shrink: 0;
+}
+.App .topInfo > h1 {
+  font-size: 0.78rem;
+  padding-top: 0;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  text-align: center;
+}
+.App .topInfoText { font-size: 1rem; }
+
+/* Turn indicator */
+.App .turnIndicator   { padding: 4px 14px; gap: 7px; }
+.App .turnArrow       { font-size: 1.2rem; }
+.App .turnLabel       { font-size: 0.82rem; letter-spacing: 1px; }
+
+/* Cards — mobile small size */
+.App .Card {
+  width: 3.6rem;
+  margin: 1px;
+}
+
+/* Player decks — 5-per-row wrap */
+.App .player1Deck,
+.App .player2Deck {
+  flex-wrap: wrap;
+  overflow-x: visible;
+  padding: 4px 8px;
+  justify-content: flex-start;
+  align-items: center;
+  max-width: calc(5 * 3.6rem + 5 * 2px);
+}
+.App .player2Deck { justify-content: flex-end; margin-left: auto; }
+.App .ownDeck     { margin-bottom: 6px; }
+.App .playerDeckText { font-size: 0.82rem; margin: 0 0 3px; }
+
+/* Middle area — hide desktop buttons col, show draw-pile col */
+.App .middleInfo {
+  gap: 14px;
+  padding: 8px 12px;
+  justify-content: center;
+}
+.App .pileCard    { width: 6rem; }
+.App .cardBackImg { width: 6rem; filter: drop-shadow(0 6px 16px rgba(0,0,0,0.5)); }
+.App .middleButtons { display: none !important; }
+.App .drawPileArea  {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.App .drawPileArea .game-button {
+  font-size: 11px;
+  padding: 7px 12px 9px;
+  width: 108px;
+  margin: 0;
+}
+
+/* Game buttons — scoped to .Game only so homepage buttons keep full size */
+.App .Game .game-button {
+  font-size: 11px;
+  padding: 5px 9px 7px;
+  margin: 6px 4px 12px;
+  box-shadow: 0 4px 0 #266b91, 0 6px 1px 1px rgba(0,0,0,.3),
+              0 7px 0 4px #12517d, 0 9px 0 4px #1a6b9a,
+              0 11px 0 4px #0c405e, 0 11px 1px 5px rgba(0,0,0,.3);
+}
+.App .Game .game-button:hover {
+  box-shadow: 0 2px 0 #266b91, 0 4px 1px 1px rgba(0,0,0,.3),
+              0 5px 0 4px #12517d, 0 7px 0 4px #1a6b9a,
+              0 9px 0 4px #0c405e, 0 9px 1px 5px rgba(0,0,0,.3);
+}
+
+/* Restore correct color shadows for coloured buttons inside .Game */
+.App .Game .game-button.red {
+  box-shadow: 0 4px 0 #ae2725, 0 6px 1px 1px rgba(0,0,0,.3),
+              0 7px 0 4px #831614, 0 9px 0 4px #a33634,
+              0 11px 0 4px #631716, 0 11px 1px 5px rgba(0,0,0,.3);
+}
+.App .Game .game-button.red:hover {
+  box-shadow: 0 2px 0 #ae2725, 0 4px 1px 1px rgba(0,0,0,.3),
+              0 5px 0 4px #831614, 0 7px 0 4px #a33634,
+              0 9px 0 4px #631716, 0 9px 1px 5px rgba(0,0,0,.3);
+}
+.App .Game .game-button.green {
+  box-shadow: 0 4px 0 #348628, 0 6px 1px 1px rgba(0,0,0,.3),
+              0 7px 0 4px #2a6d20, 0 9px 0 4px #39822e,
+              0 11px 0 4px #1d4c16, 0 11px 1px 5px rgba(0,0,0,.3);
+}
+.App .Game .game-button.green:hover {
+  box-shadow: 0 2px 0 #348628, 0 4px 1px 1px rgba(0,0,0,.3),
+              0 5px 0 4px #2a6d20, 0 7px 0 4px #39822e,
+              0 9px 0 4px #1d4c16, 0 9px 1px 5px rgba(0,0,0,.3);
+}
+.App .Game .game-button.orange {
+  box-shadow: 0 4px 0 #b76113, 0 6px 1px 1px rgba(0,0,0,.3),
+              0 7px 0 4px #75421f, 0 9px 0 4px #8a542b,
+              0 11px 0 4px #593116, 0 11px 1px 5px rgba(0,0,0,.3);
+}
+.App .Game .game-button.orange:hover {
+  box-shadow: 0 2px 0 #b76113, 0 4px 1px 1px rgba(0,0,0,.3),
+              0 5px 0 4px #75421f, 0 7px 0 4px #8a542b,
+              0 9px 0 4px #593116, 0 9px 1px 5px rgba(0,0,0,.3);
+}
+
+/* Restore full-size buttons in lobby & game-over screens */
+.App .Game .waitingCard .game-button,
+.App .Game .gameOverScreen .game-button {
+  font-size: 15px !important;
+  padding: 8px 15px 10px !important;
+  margin: 14px auto 30px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 6px 0 #348628, 0 8px 1px 1px rgba(0,0,0,.3),
+              0 10px 0 5px #2a6d20, 0 12px 0 5px #39822e,
+              0 15px 0 5px #1d4c16, 0 15px 1px 6px rgba(0,0,0,.3) !important;
+}
+.App .Game .waitingCard .game-button:hover,
+.App .Game .gameOverScreen .game-button:hover {
+  top: 2px !important;
+  box-shadow: 0 4px 0 #348628, 0 6px 1px 1px rgba(0,0,0,.3),
+              0 8px 0 5px #2a6d20, 0 10px 0 5px #39822e,
+              0 13px 0 5px #1d4c16, 0 13px 1px 6px rgba(0,0,0,.3) !important;
+}
+.App .Game > div > br { display: none; }
+
+/* UNO circular fixed button — always visible in .App */
+.App .unoFixedBtn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: fixed !important;
+  bottom: 24px !important;
+  right: 16px !important;
+  top: auto !important;
+  z-index: 200;
+  margin: 0 !important;
+  width: 72px;
+  height: 72px;
+  border-radius: 50% !important;
+  font-size: 1.1rem !important;
+  font-family: 'Carter One', sans-serif;
+  letter-spacing: 2px;
+  padding: 0 !important;
+  background: repeating-linear-gradient(45deg, #54d440, #54d440 5px, #52cc3f 5px, #52cc3f 10px) !important;
+  color: #fff !important;
+  text-shadow: 2px 2px 1px #348628, -2px 2px 1px #348628, 2px -2px 1px #348628, -2px -2px 1px #348628,
+               0px 2px 1px #348628, 0px -2px 1px #348628, 0px 4px 1px #1d4c16, 2px 4px 1px #1d4c16, -2px 4px 1px #1d4c16 !important;
+  box-shadow: 0 4px 0 #348628, 0 6px 12px rgba(0,0,0,0.45),
+              inset 0 2px 0 rgba(255,255,255,0.35) !important;
+  border: 3px solid rgba(255,255,255,0.55) !important;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.App .unoFixedBtn:hover, .App .unoFixedBtn:active {
+  transform: scale(1.08);
+  box-shadow: 0 2px 0 #348628, 0 4px 10px rgba(0,0,0,0.45),
+              inset 0 2px 0 rgba(255,255,255,0.35) !important;
+}
+.App .unoFixedBtn:disabled { cursor: not-allowed; transform: none; }
+.App .unoFixedBtn::before,
+.App .unoFixedBtn::after   { display: none; }
+
+/* Emoji bar — 3 reaction buttons above UNO button */
+.App .emojiBar {
+  display: flex !important;
+  flex-direction: column;
+  gap: 8px;
+  position: fixed !important;
+  bottom: 108px !important;
+  right: 16px !important;
+  z-index: 200;
+}
+.App .emojiBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 2px solid rgba(255,255,255,0.3);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, background 0.15s;
+  padding: 0;
+}
+.App .emojiBtn:active { transform: scale(0.88); }
+
+/* Emoji float reactions */
+.App .emojiReactionArea {
+  bottom: 264px;
+  right: 16px;
+}
+
+/* Voice container */
+.App .voiceContainer { top: 10px; right: 12px; }
+.App .voiceMicBtn    { width: 46px; height: 46px; font-size: 1.2rem; }
+
+/* Opponent badges */
+.App .opponentSection  { padding: 5px 8px 6px; min-width: 52px; border-radius: 10px; }
+.App .opponentLabel    { font-size: 0.65rem; }
+.App .opponentBadge    { width: 34px; height: 34px; font-size: 0.95rem; }
