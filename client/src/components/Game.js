@@ -569,7 +569,7 @@ const Game = (props) => {
                                     }}>🔗 Share Invite Link</button>
                                     <p className='waitingHint'>Share the link or code, then press Start</p>
                                     <button
-                                        className={`game-button ${users.length >= 2 ? 'green' : ''}`}
+                                        className='game-button green'
                                         disabled={users.length < 2}
                                         onClick={startGame}
                                         style={{marginTop: '14px', width: '100%'}}
