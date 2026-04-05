@@ -193,6 +193,11 @@ io.on('connection', socket => {
         const roomUsers = getUsersInRoom(user.room)
         if (roomUsers.length < 2) return
 
+        // Force a clean WebRTC signaling round for this restarted match.
+        if (voiceRooms[user.room]) {
+            delete voiceRooms[user.room]
+        }
+
         const playerList = roomUsers.map(u => u.name)
         const shuffled   = shuffleArray([...PACK_OF_CARDS])
         const decks = {}
@@ -221,6 +226,7 @@ io.on('connection', socket => {
         }
 
         io.to(user.room).emit('initGameState', gameState)
+        io.to(user.room).emit('forceVoiceReconnect')
 
         if (isDBConnected()) {
             try {
