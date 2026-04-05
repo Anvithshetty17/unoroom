@@ -19,6 +19,8 @@ const Game = (props) => {
     const socketRef = useRef(null)
     const localStreamRef       = useRef(null)     // local mic MediaStream
     const peerConnectionsRef   = useRef({})        // { [socketId]: RTCPeerConnection }
+    const joinInProgressRef    = useRef(false)
+    const reconnectTimerRef    = useRef(null)
     const data = queryString.parse(props.location.search)
     const _searchParams  = new URLSearchParams(props.location.search)
 
@@ -74,6 +76,10 @@ const Game = (props) => {
             if (error) setRoomFull(true)
         })
         return () => {
+            if (reconnectTimerRef.current) {
+                clearTimeout(reconnectTimerRef.current)
+                reconnectTimerRef.current = null
+            }
             Object.values(peerConnectionsRef.current).forEach(pc => pc.close())
             Object.keys(peerConnectionsRef.current).forEach(id => {
                 const a = document.getElementById('voice-audio-' + id)
@@ -104,10 +110,6 @@ const Game = (props) => {
             setHasDrawn(false)
             setDrawnCardKey(null)
             setUnoButtonPressed(false)
-            // Reset voice peers on new game (they will reconnect when joining voice)
-            if (!state.gameOver) {
-                setVoicePeers({})
-            }
         })
 
         socket.on('updateGameState', (state) => {
@@ -188,6 +190,15 @@ const Game = (props) => {
         socket.on('voicePeerLeft', ({ peerId }) => {
             closePeerConnection(peerId)
         })
+
+        socket.on('forceVoiceReconnect', () => {
+            leaveVoice()
+            if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
+            reconnectTimerRef.current = setTimeout(() => {
+                reconnectTimerRef.current = null
+                joinVoice()
+            }, 300)
+        })
     }, [])
 
     const nextPlayer = (currentTurn, dir, playerList, skip = 0) => {
@@ -212,14 +223,17 @@ const Game = (props) => {
         setColorPickerCallback(prev => { if (prev) prev(color); return null })
     }
 
-    // Auto-join voice when game starts, leave when game ends
+    // Voice lifecycle per match: end => leave, start/restart => force fresh rejoin.
     useEffect(() => {
         if (!gameOver && winner === '') {
-            // game just started — join voice muted
-            if (!voiceActive) joinVoice()
+            leaveVoice()
+            if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
+            reconnectTimerRef.current = setTimeout(() => {
+                reconnectTimerRef.current = null
+                joinVoice()
+            }, 250)
         } else {
-            // game over / lobby — leave voice
-            if (voiceActive) leaveVoice()
+            leaveVoice()
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [gameOver])
@@ -237,29 +251,15 @@ const Game = (props) => {
 
     // ── WebRTC Voice Chat helpers ─────────────────────────────────
     const createPeerConnection = (peerId, peerName) => {
-        // Close existing connection if it exists (e.g., on game restart)
-        if (peerConnectionsRef.current[peerId]) {
-            closePeerConnection(peerId)
-        }
-        
         const pc = new RTCPeerConnection({ iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' }
         ]})
-        
-        // Add local audio tracks to peer connection
         if (localStreamRef.current) {
-            try {
-                localStreamRef.current.getTracks().forEach(track => {
-                    if (track.kind === 'audio') {
-                        pc.addTrack(track, localStreamRef.current)
-                    }
-                })
-            } catch (err) {
-                console.error('Error adding audio track:', err)
-            }
+            localStreamRef.current.getTracks().forEach(track =>
+                pc.addTrack(track, localStreamRef.current)
+            )
         }
-        
         pc.ontrack = (e) => {
             const audioId = 'voice-audio-' + peerId
             let audio = document.getElementById(audioId)
@@ -267,20 +267,15 @@ const Game = (props) => {
                 audio = document.createElement('audio')
                 audio.id = audioId
                 audio.autoplay = true
-                audio.playsinline = true
                 document.body.appendChild(audio)
             }
-            if (e.streams && e.streams[0]) {
-                audio.srcObject = e.streams[0]
-            }
+            audio.srcObject = e.streams[0]
         }
-        
         pc.onicecandidate = (e) => {
             if (e.candidate && socketRef.current) {
                 socketRef.current.emit('voiceIceCandidate', { targetId: peerId, candidate: e.candidate })
             }
         }
-        
         peerConnectionsRef.current[peerId] = pc
         setVoicePeers(prev => ({ ...prev, [peerId]: peerName }))
         return pc
@@ -297,46 +292,32 @@ const Game = (props) => {
     }
 
     const joinVoice = async () => {
+        if (joinInProgressRef.current || voiceActive) return
+        joinInProgressRef.current = true
+
         try {
-            // Ensure we don't have leftover peer connections
-            Object.keys(peerConnectionsRef.current).forEach(id => closePeerConnection(id))
-            peerConnectionsRef.current = {}
-            
-            // Stop any existing audio tracks before getting new stream
-            if (localStreamRef.current) {
-                localStreamRef.current.getTracks().forEach(t => {
-                    t.stop()
-                    t.enabled = false
-                })
-            }
-            
-            // Get fresh media stream
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
             // start muted — user must press button to unmute
             stream.getAudioTracks().forEach(t => { t.enabled = false })
             localStreamRef.current = stream
-            
-            // Update state and notify server
             setIsMuted(true)
             setVoiceActive(true)
             socketRef.current && socketRef.current.emit('joinVoice')
-        } catch (err) {
-            console.warn('Microphone access denied or unavailable:', err)
+        } catch (_) {
             // mic denied — still join as listener (speaker always on)
             localStreamRef.current = null
             setIsMuted(true)
             setVoiceActive(true)
             socketRef.current && socketRef.current.emit('joinVoice')
+        } finally {
+            joinInProgressRef.current = false
         }
     }
 
     const leaveVoice = () => {
-        // Close all peer connections and remove audio elements
+        joinInProgressRef.current = false
         Object.keys(peerConnectionsRef.current).forEach(id => closePeerConnection(id))
-        // Ensure peerConnectionsRef is completely cleared
         peerConnectionsRef.current = {}
-        
-        // Stop all local audio tracks
         if (localStreamRef.current) {
             localStreamRef.current.getTracks().forEach(t => {
                 t.stop()
@@ -344,11 +325,7 @@ const Game = (props) => {
             })
             localStreamRef.current = null
         }
-        
-        // Notify server we're leaving voice
         socketRef.current && socketRef.current.emit('leaveVoice')
-        
-        // Clear all voice state
         setVoiceActive(false)
         setIsMuted(false)
         setVoicePeers({})
