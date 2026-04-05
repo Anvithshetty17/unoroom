@@ -130,6 +130,7 @@ const Game = (props) => {
             setHasDrawn(false)
             setDrawnCardKey(null)
         })
+        
 
         socket.on('roomData',       ({ users }) => setUsers(users))
         socket.on('currentUserData',({ name, isHost: h }) => { setCurrentUser(name); setIsHost(!!h) })
