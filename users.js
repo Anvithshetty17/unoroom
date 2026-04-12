@@ -1,7 +1,7 @@
 const users = []
 const MAX_ROOM_SIZE = 10
 
-const addUser = ({ id, room, name }) => {
+const addUser = ({ id, room, name, isBot = false, difficulty = 'normal' }) => {
     const usersInRoom = users.filter(u => u.room === room)
     if (usersInRoom.length >= MAX_ROOM_SIZE)
         return { error: 'Room full' }
@@ -20,7 +20,7 @@ const addUser = ({ id, room, name }) => {
     // First player in the room is the host
     const isHost = usersInRoom.length === 0
 
-    const newUser = { id, name: assignedName, room, isHost }
+    const newUser = { id, name: assignedName, room, isHost, isBot, difficulty }
     users.push(newUser)
     return { newUser }
 }

@@ -25,6 +25,8 @@ const Game = (props) => {
     const _searchParams  = new URLSearchParams(props.location.search)
 
     const [room]         = useState(_searchParams.get('roomCode') || data.roomCode || '')
+    const [botMode]      = useState(_searchParams.get('botMode') === 'true')
+    const [botDifficulty] = useState(_searchParams.get('botDifficulty') || 'normal')
     const [roomFull, setRoomFull]   = useState(false)
     const [users, setUsers]         = useState([])
     const [currentUser, setCurrentUser] = useState('')
@@ -72,7 +74,7 @@ const Game = (props) => {
             transports: ['websocket']
         })
         socketRef.current = socket
-        socket.emit('join', { room, name: data.name || '' }, (error) => {
+        socket.emit('join', { room, name: data.name || '', botMode, botDifficulty }, (error) => {
             if (error) setRoomFull(true)
         })
         return () => {
@@ -226,6 +228,7 @@ const Game = (props) => {
 
     // Voice lifecycle per match: end => leave, start/restart => force fresh rejoin.
     useEffect(() => {
+        if (botMode) return;
         if (!gameOver && winner === '') {
             leaveVoice()
             if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
@@ -237,7 +240,7 @@ const Game = (props) => {
             leaveVoice()
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [gameOver])
+    }, [gameOver, botMode])
 
     const showToast = (msg, type = 'info') => {
         setToast({ msg, type })
@@ -383,6 +386,7 @@ const Game = (props) => {
         const isWinner   = myDeck.length === 0
         const newPlayed  = [...copiedPlayed, played_card]
         const base = {
+            players, direction, currentColor, currentNumber, stackPenalty, stackType,
             playerDecks: newDecks,
             playedCardsPile: newPlayed,
             drawCardPile: copiedDraw,
@@ -498,6 +502,7 @@ const Game = (props) => {
         setHasDrawn(false)
         setDrawnCardKey(null)
         socketRef.current && socketRef.current.emit('updateGameState', {
+            players, direction, currentColor, currentNumber,
             playerDecks,
             playedCardsPile,
             drawCardPile,
@@ -520,6 +525,7 @@ const Game = (props) => {
         const newDecks = { ...playerDecks, [currentUser]: myNewCards }
         playDraw2CardSound()
         socketRef.current && socketRef.current.emit('updateGameState', {
+            players, direction, currentColor, currentNumber,
             playerDecks: newDecks,
             drawCardPile: copiedDraw,
             playedCardsPile,
@@ -533,6 +539,8 @@ const Game = (props) => {
     const opponentNames = players.filter(p => p !== currentUser)
     const isMyTurn      = turn === currentUser
     const inLobby       = gameOver && winner === ''
+    const currentTurnUser = users.find(u => u.name === turn)
+    const isBotTurn = currentTurnUser && currentTurnUser.isBot
     // A drawn card is "playable" if it can be put on the pile right now
     const drawnCardPlayable = drawnCardKey && (() => {
         const c = drawnCardKey
@@ -669,7 +677,7 @@ const Game = (props) => {
 
                             <div className={`turnIndicator ${isMyTurn ? 'myTurn' : 'theirTurn'}`}>
                                 <span className='turnArrow'>{isMyTurn ? '\u25BC' : '\u25B2'}</span>
-                                <span className='turnLabel'>{isMyTurn ? 'YOUR TURN' : `${turn}'S TURN`}</span>
+                                <span className='turnLabel'>{isMyTurn ? 'YOUR TURN' : (isBotTurn ? `${turn} is thinking...` : `${turn}'S TURN`)}</span>
                             </div>
 
                             <div className='middleInfo' style={!isMyTurn ? {pointerEvents: 'none'} : null}>
@@ -812,7 +820,7 @@ onClick={() => { setUnoButtonPressed(!isUnoButtonPressed); playUnoSound(); if (!
             </div>
 
             {/* Voice Chat — only during active game */}
-            {!gameOver && (
+            {!gameOver && !botMode && (
             <div className='voiceContainer'>
                 <button
                     className={`voiceMicBtn${voiceActive ? (isMuted ? ' voiceMicMuted' : ' voiceMicActive') : ''}`}

@@ -9,6 +9,7 @@ const GameRoom = require('./models/GameRoom')
 const path = require('path')
 const PACK_OF_CARDS = require('./utils/packOfCards')
 const shuffleArray  = require('./utils/shuffleArray')
+const { processBotTurn } = require('./utils/botEngine')
 
 const ACTION_CARDS = ['skipR','skipG','skipB','skipY','_R','_G','_B','_Y','D2R','D2G','D2B','D2Y','W','D4W']
 
@@ -69,6 +70,48 @@ app.get('/admin/clear-db', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 io.on('connection', socket => {
+
+    const triggerBotIfNext = (room, gameState, delay = 1500) => {
+        if (gameState.gameOver) return;
+        const currentTurnPlayer = gameState.turn;
+        const usersInRoom = getUsersInRoom(room);
+        const botUser = usersInRoom.find(u => u.name === currentTurnPlayer && u.isBot);
+        
+        console.log(`Checking bot turn for room ${room}. Turn is ${currentTurnPlayer}. Bot? ${!!botUser}`);
+
+        if (botUser) {
+            console.log(`Bot ${botUser.name} is scheduled to play...`);
+            setTimeout(async () => {
+                console.log(`Processing bot turn...`);
+                try {
+                    const { nextState, emoji, declaredUno, sound } = processBotTurn(gameState, botUser.name, botUser.difficulty);
+                    
+                    if (declaredUno) io.to(room).emit('unoAnnouncement', { name: botUser.name });
+                    if (emoji) io.to(room).emit('emojiReaction', { name: botUser.name, emoji });
+                    
+                    io.to(room).emit('updateGameState', nextState);
+                    
+                    if (isDBConnected()) {
+                        if (nextState.gameOver === true) {
+                            await GameRoom.deleteOne({ room: room })
+                        } else {
+                            await GameRoom.findOneAndUpdate(
+                                { room: room },
+                                { $set: { ...nextState, lastActivity: Date.now() } },
+                                { new: true }
+                            )
+                        }
+                    }
+                    console.log(`Turn played out! Next -> ${nextState.turn}`);
+                    
+                    triggerBotIfNext(room, nextState, 1500);
+                } catch (e) {
+                    console.error('Error in bot processing hook! ', e);
+                }
+            }, delay);
+        }
+    }
+
     socket.on('join', async (payload, callback) => {
         // Register in-memory user first (atomic slot assignment — no race condition)
         const { error, newUser } = addUser({
@@ -79,6 +122,17 @@ io.on('connection', socket => {
 
         if (error)
             return callback(error)
+
+        if (payload.botMode) {
+            // Add a bot to the room
+            addUser({
+                id: `bot_${socket.id}`,
+                room: payload.room,
+                name: 'Bot_1',
+                isBot: true,
+                difficulty: payload.botDifficulty || 'normal'
+            })
+        }
 
         // Persist socket ID to DB for the assigned player slot
         if (isDBConnected()) {
@@ -173,6 +227,7 @@ io.on('connection', socket => {
         }
 
         io.to(user.room).emit('initGameState', gameState)
+        triggerBotIfNext(user.room, gameState)
 
         if (isDBConnected()) {
             try {
@@ -295,6 +350,8 @@ io.on('connection', socket => {
                     console.error('Error updating game state:', err)
                 }
             }
+
+            triggerBotIfNext(user.room, gameState);
         }
     })
 
@@ -380,6 +437,9 @@ io.on('connection', socket => {
     socket.on('disconnect', async () => {
         const user = removeUser(socket.id)
         if (user) {
+            // Also remove associated bot
+            removeUser(`bot_${socket.id}`)
+
             // Voice cleanup on disconnect
             if (voiceRooms[user.room]) {
                 voiceRooms[user.room].delete(socket.id)
@@ -392,10 +452,10 @@ io.on('connection', socket => {
 
             if (isDBConnected()) {
                 try {
-                    // If room is now empty, wipe all DB data for it
-                    if (remaining.length === 0) {
+                    // If room is now empty or only contains bots, wipe all DB data for it
+                    if (remaining.length === 0 || remaining.every(u => u.isBot)) {
                         await GameRoom.deleteOne({ room: user.room })
-                        console.log(`Room ${user.room} is empty — DB record deleted`)
+                        console.log(`Room ${user.room} is empty or only bots — DB record deleted`)
                     } else {
                         // Free the player slot
                         const dbRoom = await GameRoom.findOne({ room: user.room })

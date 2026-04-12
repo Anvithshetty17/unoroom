@@ -29,3 +29,5 @@ dist/
 
 # Testing
 coverage/
+.env
+node_modules/
