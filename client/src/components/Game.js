@@ -53,6 +53,8 @@ const Game = (props) => {
     const [stackType, setStackType]       = useState(null)   // 'D2' or 'D4' — last stack card type
     const [emojiReactions, setEmojiReactions] = useState([]) // [{id, name, emoji}]
     const [pressedEmoji, setPressedEmoji]     = useState(null)
+    const [chatInput, setChatInput]           = useState('')
+    const [chatMessages, setChatMessages]     = useState([]) // [{id, name, text}]
 
     const [voiceActive, setVoiceActive]   = useState(false)
     const [isMuted, setIsMuted]           = useState(false)
@@ -145,6 +147,12 @@ const Game = (props) => {
             const id = Date.now() + Math.random()
             setEmojiReactions(prev => [...prev, { id, name, emoji }])
             setTimeout(() => setEmojiReactions(prev => prev.filter(r => r.id !== id)), 2600)
+        })
+
+        socket.on('chatMessage', ({ name, text }) => {
+            const id = Date.now() + Math.random()
+            setChatMessages(prev => [...prev, { id, name, text }]) 
+            setTimeout(() => setChatMessages(prev => prev.filter(r => r.id !== id)), 15000)
         })
 
         // ── WebRTC Voice Chat ─────────────────────────────────────────
@@ -747,9 +755,9 @@ const Game = (props) => {
                                 </div>
                             </div>
 
-                            {/* Emoji reaction bar — fixed above UNO button, mobile only */}
+                            {/* Emoji reaction bar & Input — fixed above UNO button, mobile only */}
                             <div className='emojiBar'>
-                                {['😂','😤','😢'].map(em => (
+                                {['😂','😤','😢','😎','😡','🎉'].map(em => (
                                     <button
                                         key={em}
                                         className={`emojiBtn${pressedEmoji === em ? ' emojiBtn--pop' : ''}`}
@@ -760,6 +768,23 @@ const Game = (props) => {
                                         }}
                                     >{em}</button>
                                 ))}
+                                
+                                {/* Chat Input merged into Grid */}
+                                <div className='chatInputBarInGrid'>
+                                    <input 
+                                        type='text' 
+                                        placeholder='Type a message...' 
+                                        value={chatInput}
+                                        onChange={e => setChatInput(e.target.value)}
+                                        maxLength={30}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' && chatInput.trim()) {
+                                                socketRef.current && socketRef.current.emit('chatMessage', { text: chatInput.trim() })
+                                                setChatInput('')
+                                            }
+                                        }}
+                                    />
+                                </div>
                             </div>
 
                             {/* Mobile UNO button — fixed bottom-right */}
@@ -809,11 +834,26 @@ onClick={() => { setUnoButtonPressed(!isUnoButtonPressed); playUnoSound(); if (!
                 </div>
             )}
 
-            {/* Floating emoji reactions */}
+            {/* Floating emoji reactions & chat messages */}
+            <div className='chatMessagesArea'>
+                {chatMessages.map(msg => (
+                    <div key={msg.id} className='chatMessageItem'>
+                        <div style={{ flex: 1 }}>
+                            <strong>{msg.name}:</strong> <span>{msg.text}</span>
+                        </div>
+                        <button 
+                            className='chatCloseBtn' 
+                            onClick={() => setChatMessages(prev => prev.filter(r => r.id !== msg.id))}
+                        >×</button>
+                    </div>
+                ))}
+            </div>
+
             <div className='emojiReactionArea'>
                 {emojiReactions.map(r => (
                     <div key={r.id} className='emojiReactionFloat'>
-                        <span className='emojiReactionEmoji'>{r.emoji}</span>
+                        {r.emoji ? <span className='emojiReactionEmoji'>{r.emoji}</span> 
+                                 : <span className='emojiReactionText'>{r.text}</span>}
                         <span className='emojiReactionName'>{r.name}</span>
                     </div>
                 ))}

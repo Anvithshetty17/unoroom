@@ -369,6 +369,13 @@ io.on('connection', socket => {
         }
     })
 
+    socket.on('chatMessage', ({ text }) => {
+        const user = getUser(socket.id)
+        if (user) {
+            io.to(user.room).emit('chatMessage', { name: user.name, text })
+        }
+    })
+
     // ── WebRTC Voice Chat Signaling ──────────────────────────────────
     socket.on('joinVoice', () => {
         const user = getUser(socket.id)
